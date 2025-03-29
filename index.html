@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take a Picture</title>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; }
+        video, canvas { width: 100%; max-width: 400px; margin: 10px 0; }
+        button { padding: 10px 20px; font-size: 18px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>Take a Picture</h2>
+    <video id="video" autoplay playsinline></video>
+    <br>
+    <button id="capture">Capture</button>
+    <br>
+    <canvas id="canvas"></canvas>
+    <br>
+    <a id="download" download="captured-image.png" style="display:none;">Download Image</a>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureButton = document.getElementById('capture');
+        const downloadLink = document.getElementById('download');
+        
+        // Start camera stream (Back Camera Only)
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error("Error accessing the camera: ", err);
+                alert("Camera access is required to take a picture.");
+            });
+
+        // Capture image
+        captureButton.addEventListener('click', () => {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert to image and provide download option
+            const imageUrl = canvas.toDataURL("image/png");
+            downloadLink.href = imageUrl;
+            downloadLink.style.display = "block";
+            downloadLink.textContent = "Download Image";
+        });
+    </script>
+</body>
+</html>

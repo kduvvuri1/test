@@ -8,7 +8,11 @@
         body { text-align: center; font-family: Arial, sans-serif; }
         video, canvas { width: 100%; max-width: 400px; margin: 10px 0; }
         button { padding: 10px 20px; font-size: 18px; cursor: pointer; }
+        #status { color: #333; margin-top: 10px; }
     </style>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js"></script>
 </head>
 <body>
     <h2>Take a Picture</h2>
@@ -19,13 +23,30 @@
     <canvas id="canvas"></canvas>
     <br>
     <a id="download" download="captured-image.png" style="display:none;">Download Image</a>
+    <p id="status"></p>
 
     <script>
+        // Your Firebase configuration (replace with your own)
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const storage = firebase.storage();
+        const storageRef = storage.ref();
+
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const captureButton = document.getElementById('capture');
         const downloadLink = document.getElementById('download');
-        
+        const status = document.getElementById('status');
+
         // Start camera stream (Back Camera Only)
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
             .then(stream => {
@@ -36,18 +57,41 @@
                 alert("Camera access is required to take a picture.");
             });
 
-        // Capture image
+        // Capture and upload image
         captureButton.addEventListener('click', () => {
             const context = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Convert to image and provide download option
-            const imageUrl = canvas.toDataURL("image/png");
-            downloadLink.href = imageUrl;
-            downloadLink.style.display = "block";
-            downloadLink.textContent = "Download Image";
+            // Convert canvas to Blob
+            canvas.toBlob((blob) => {
+                // Create a unique filename (e.g., timestamp + random string)
+                const fileName = `photo_${Date.now()}_${Math.random().toString(36).substring(2, 15)}.png`;
+                const imageRef = storageRef.child(`images/${fileName}`);
+
+                // Upload to Firebase Storage
+                status.textContent = "Uploading...";
+                imageRef.put(blob)
+                    .then((snapshot) => {
+                        console.log('Uploaded a blob!');
+                        return snapshot.ref.getDownloadURL(); // Get the URL of the uploaded image
+                    })
+                    .then((downloadURL) => {
+                        status.textContent = "Upload successful!";
+                        console.log('File available at:', downloadURL);
+
+                        // Optionally, still provide a download link
+                        const imageUrl = canvas.toDataURL("image/png");
+                        downloadLink.href = imageUrl;
+                        downloadLink.style.display = "block";
+                        downloadLink.textContent = "Download Image";
+                    })
+                    .catch((error) => {
+                        console.error("Upload failed:", error);
+                        status.textContent = "Upload failed: " + error.message;
+                    });
+            }, "image/png");
         });
     </script>
 </body>

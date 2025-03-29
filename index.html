@@ -42,7 +42,7 @@
             margin: 10px 0;
         }
 
-        button {
+        button, input {
             background-color: #007BFF;
             color: white;
             border: none;
@@ -54,70 +54,178 @@
             margin: 10px;
         }
 
+        input {
+            background-color: white;
+            color: #333;
+            border: 1px solid #007BFF;
+            text-align: center;
+        }
+
         button:hover {
             background-color: #0056b3;
         }
 
-        #download {
+        #pairing-section, #camera-section {
             display: none;
-            margin-top: 15px;
-            font-size: 18px;
-            color: #007BFF;
-            text-decoration: none;
-            font-weight: bold;
         }
 
-        #download:hover {
-            text-decoration: underline;
+        #pairing-section.active, #camera-section.active {
+            display: block;
+        }
+
+        #status {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
         }
     </style>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js"></script>
 </head>
 <body>
-
-    <!-- Top Bar -->
     <div class="top-bar">CaughtMyEye</div>
 
     <div class="container">
-        <h2>Take a Picture</h2>
-        <video id="video" autoplay playsinline></video>
-        <br>
-        <button id="capture">📸 Capture</button>
-        <br>
-        <canvas id="canvas"></canvas>
-        <br>
-        <a id="download" download="captured-image.png">Download Image</a>
+        <div id="pairing-section" class="active">
+            <h2>Pair Device</h2>
+            <input type="text" id="pairing-code" placeholder="Enter 6-digit code" maxlength="6">
+            <button id="pair-button">Pair Device</button>
+            <div id="status"></div>
+        </div>
+
+        <div id="camera-section">
+            <h2>Take a Picture</h2>
+            <video id="video" autoplay playsinline></video>
+            <button id="capture">📸 Capture</button>
+            <canvas id="canvas"></canvas>
+            <div id="status"></div>
+        </div>
     </div>
 
     <script>
+        // Initialize Firebase with your config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        // DOM elements
+        const pairingSection = document.getElementById('pairing-section');
+        const cameraSection = document.getElementById('camera-section');
+        const pairButton = document.getElementById('pair-button');
+        const pairingCodeInput = document.getElementById('pairing-code');
+        const statusDiv = document.getElementById('status');
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const captureButton = document.getElementById('capture');
-        const downloadLink = document.getElementById('download');
+        let pairedUserId = null;
 
-        // Start camera stream (Back Camera Only)
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(stream => {
-                video.srcObject = stream;
-            })
-            .catch(err => {
-                console.error("Error accessing the camera: ", err);
-                alert("Camera access is required to take a picture.");
-            });
+        // Pairing logic
+        pairButton.addEventListener('click', async () => {
+            const code = pairingCodeInput.value.trim().toUpperCase();
+            if (!code || code.length !== 6) {
+                showStatus('Please enter a valid 6-digit code', 'error');
+                return;
+            }
 
-        // Capture image
-        captureButton.addEventListener('click', () => {
-            const context = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            try {
+                const docRef = db.doc(`pairingCodes/${code}`);
+                const docSnap = await docRef.get();
+                
+                if (!docSnap.exists) {
+                    showStatus('Invalid pairing code', 'error');
+                    return;
+                }
 
-            // Convert to image and provide download option
-            const imageUrl = canvas.toDataURL("image/png");
-            downloadLink.href = imageUrl;
-            downloadLink.style.display = "block";
-            downloadLink.textContent = "📥 Download Image";
+                const data = docSnap.data();
+                if (data.status === 'completed') {
+                    showStatus('This code has already been used', 'error');
+                    return;
+                }
+
+                // Complete the pairing
+                await docRef.update({
+                    status: 'completed',
+                    pairedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                pairedUserId = data.userId;
+                showStatus('Device paired successfully!', 'success');
+                
+                // Switch to camera view
+                pairingSection.classList.remove('active');
+                cameraSection.classList.add('active');
+                initializeCamera();
+            } catch (error) {
+                showStatus('Pairing failed: ' + error.message, 'error');
+            }
         });
-    </script>
 
+        // Camera logic
+        function initializeCamera() {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then(stream => {
+                    video.srcObject = stream;
+                })
+                .catch(err => {
+                    showStatus('Error accessing camera: ' + err.message, 'error');
+                });
+
+            captureButton.addEventListener('click', async () => {
+                const context = canvas.getContext('2d');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                try {
+                    showStatus('Uploading image...', '');
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+                    
+                    // Upload to user's storage path
+                    const storageRef = storage.ref();
+                    const photoRef = storageRef.child(`userPhotos/${pairedUserId}/${Date.now()}.jpg`);
+                    await photoRef.put(blob);
+                    
+                    // Get download URL
+                    const downloadURL = await photoRef.getDownloadURL();
+                    
+                    // Save reference in Firestore
+                    await db.collection('userPhotos').add({
+                        userId: pairedUserId,
+                        url: downloadURL,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    showStatus('Photo uploaded successfully!', 'success');
+                } catch (error) {
+                    showStatus('Upload failed: ' + error.message, 'error');
+                }
+            });
+        }
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = type ? type : '';
+        }
+    </script>
 </body>
 </html>

@@ -3,29 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Take a Picture</title>
+    <title>CaughtMyEye - Take a Picture</title>
     <style>
-        body { text-align: center; font-family: Arial, sans-serif; }
-        video, canvas { width: 100%; max-width: 400px; margin: 10px 0; }
-        button { padding: 10px 20px; font-size: 18px; cursor: pointer; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            background-color: #f4f4f4; 
+            color: #333;
+        }
+        
+        /* Top Bar */
+        .top-bar {
+            width: 100%;
+            background-color: #007BFF;
+            color: white;
+            padding: 15px 0;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+        }
+
+        .container {
+            margin-top: 80px;
+            padding: 20px;
+        }
+
+        video, canvas {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 8px;
+            border: 2px solid #007BFF;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 10px 0;
+        }
+
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin: 10px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #download {
+            display: none;
+            margin-top: 15px;
+            font-size: 18px;
+            color: #007BFF;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        #download:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
-    <h2>Take a Picture</h2>
-    <video id="video" autoplay playsinline></video>
-    <br>
-    <button id="capture">Capture</button>
-    <br>
-    <canvas id="canvas"></canvas>
-    <br>
-    <a id="download" download="captured-image.png" style="display:none;">Download Image</a>
+
+    <!-- Top Bar -->
+    <div class="top-bar">CaughtMyEye</div>
+
+    <div class="container">
+        <h2>Take a Picture</h2>
+        <video id="video" autoplay playsinline></video>
+        <br>
+        <button id="capture">📸 Capture</button>
+        <br>
+        <canvas id="canvas"></canvas>
+        <br>
+        <a id="download" download="captured-image.png">Download Image</a>
+    </div>
 
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const captureButton = document.getElementById('capture');
         const downloadLink = document.getElementById('download');
-        
+
         // Start camera stream (Back Camera Only)
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
             .then(stream => {
@@ -47,8 +115,9 @@
             const imageUrl = canvas.toDataURL("image/png");
             downloadLink.href = imageUrl;
             downloadLink.style.display = "block";
-            downloadLink.textContent = "Download Image";
+            downloadLink.textContent = "📥 Download Image";
         });
     </script>
+
 </body>
 </html>

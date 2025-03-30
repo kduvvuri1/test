@@ -6,7 +6,7 @@
     <title>CaughtMyEye - Mobile Capture</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        #video, #canvas {
+          #video {
             width: 100%;
             height: auto;
             max-height: 60vh;
@@ -19,6 +19,16 @@
             transform-origin: center;
         }
         
+        #canvas {
+            width: 100%;
+            height: auto;
+            max-height: 60vh;
+            border-radius: 0.5rem;
+            border: 2px solid #3b82f6;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: #000;
+        }
+
         #canvas {
             display: none;
             margin-top: 1rem;

@@ -151,38 +151,35 @@
             try {
                 showStatus('Verifying code...', '');
                 
-                // Use the Firebase SDK instead of REST API for simplicity
                 const docRef = db.collection('pairingCodes').doc(code);
                 const docSnap = await docRef.get();
                 
-                console.log("Code check result:", docSnap.exists()); // Debug log
-                
-                if (!docSnap.exists) {
+                // v8 syntax - exists is a property
+                if (!docSnap.exists) {  // No parentheses!
                     throw new Error('Invalid pairing code');
                 }
                 
                 const data = docSnap.data();
-                console.log("Retrieved code data:", data); // Debug log
                 
-                if (data.status === 'completed') {
-                    throw new Error('This code has already been used');
+                // Add status check
+                if (!data.status || data.status !== 'pending') {
+                    throw new Error('Invalid code status');
                 }
         
-                // Update using the Firebase SDK
                 await docRef.update({
                     status: 'completed',
-                    pairedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    pairedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    completedAt: new Date()  // Add timestamp for debugging
                 });
                 
                 pairedUserId = data.userId;
                 showStatus('Device paired successfully!', 'success');
                 
-                // Switch to camera view
                 pairingSection.classList.remove('active');
                 cameraSection.classList.add('active');
                 initializeCamera();
             } catch (error) {
-                console.error('Pairing error details:', error); // Detailed error log
+                console.error('Pairing error:', error);
                 showStatus('Pairing failed: ' + error.message, 'error');
             }
         });

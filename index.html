@@ -114,132 +114,138 @@
         </div>
     </div>
 
-    <script>
-        // Initialize Firebase with your config
-        const firebaseConfig = {
-          apiKey: "AIzaSyD6QROJZ1Y3ZfiugqBxpPeeuQ7J3K22CbQ",
-          authDomain: "first-project-418816.firebaseapp.com",
-          projectId: "first-project-418816",
-          storageBucket: "first-project-418816.firebasestorage.app",
-          messagingSenderId: "750936274957",
-          appId: "1:750936274957:web:7a96ae9d7819f555b3bd44",
-          measurementId: "G-5WDTNYPPT7"
-        };
-         firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const storage = firebase.storage();
+<script>
+  // Firebase initialization (keep your existing config)
+  const firebaseConfig = {
+    apiKey: "AIzaSyD6QROJZ1Y3ZfiugqBxpPeeuQ7J3K22CbQ",
+    authDomain: "first-project-418816.firebaseapp.com",
+    projectId: "first-project-418816",
+    storageBucket: "first-project-418816.appspot.com",
+    messagingSenderId: "750936274957",
+    appId: "1:750936274957:web:7a96ae9d7819f555b3bd44"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const storage = firebase.storage();
 
-        // DOM elements
-        const pairingSection = document.getElementById('pairing-section');
-        const cameraSection = document.getElementById('camera-section');
-        const pairButton = document.getElementById('pair-button');
-        const pairingCodeInput = document.getElementById('pairing-code');
-        const statusDiv = document.getElementById('status');
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const captureButton = document.getElementById('capture');
-        let pairedUserId = null;
+  // DOM elements
+  const pairingSection = document.getElementById('pairing-section');
+  const cameraSection = document.getElementById('camera-section');
+  const pairButton = document.getElementById('pair-button');
+  const pairingCodeInput = document.getElementById('pairing-code');
+  const statusDiv = document.getElementById('status');
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const captureButton = document.getElementById('capture');
+  let pairedUserId = null;
+  let currentPhotoRef = null;
+  let stream = null;
 
-        // Pairing logic
-        pairButton.addEventListener('click', async () => {
-            const code = pairingCodeInput.value.trim().toUpperCase();
-            if (!code || code.length !== 6) {
-                showStatus('Please enter a valid 6-digit code', 'error');
-                return;
-            }
-        
-            try {
-                showStatus('Verifying code...', '');
-                
-                const docRef = db.collection('pairingCodes').doc(code);
-                const docSnap = await docRef.get();
-                
-                // v8 syntax - exists is a property
-                if (!docSnap.exists) {  // No parentheses!
-                    throw new Error('Invalid pairing code');
-                }
-                
-                const data = docSnap.data();
-                
-                // Add status check
-                if (!data.status || data.status !== 'pending') {
-                    throw new Error('Invalid code status');
-                }
-        
-                await docRef.update({
-                    status: 'completed',
-                    pairedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    completedAt: new Date()  // Add timestamp for debugging
-                });
-                
-                pairedUserId = data.userId;
-                showStatus('Device paired successfully!', 'success');
-                
-                pairingSection.classList.remove('active');
-                cameraSection.classList.add('active');
-                initializeCamera();
-            } catch (error) {
-                console.error('Pairing error:', error);
-                showStatus('Pairing failed: ' + error.message, 'error');
-            }
-        });
+  // Pairing logic (keep your existing pairing code)
 
-        // Camera logic
-        function initializeCamera() {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-                .then(stream => {
-                    video.srcObject = stream;
-                })
-                .catch(err => {
-                    showStatus('Error accessing camera: ' + err.message, 'error');
-                });
+  // New camera logic
+  function initializeCamera() {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(s => {
+        stream = s;
+        video.srcObject = stream;
+      })
+      .catch(err => {
+        showStatus('Camera error: ' + err.message, 'error');
+      });
 
-            captureButton.addEventListener('click', async () => {
-                const context = canvas.getContext('2d');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    captureButton.textContent = '📸 Capture';
+    captureButton.onclick = capturePhoto;
+  }
 
-                try {
-                    showStatus('Uploading image...', '');
-                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
-                    
-                    // Upload directly to Storage using the paired user ID
-                    const storageRef = storage.ref();
-                    const photoRef = storageRef.child(`userPhotos/${pairedUserId}/${Date.now()}.jpg`);
-                    const uploadTask = photoRef.put(blob);
-                    
-                    uploadTask.on('state_changed',
-                        null,
-                        (error) => {
-                            showStatus('Upload failed: ' + error.message, 'error');
-                        },
-                        async () => {
-                            const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
-                            showStatus('Photo uploaded successfully!', 'success');
-                            
-                            // Optional: Notify the web app via Firestore
-                            try {
-                                await db.collection('userPhotos').add({
-                                    userId: pairedUserId,
-                                    url: downloadURL,
-                                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                                });
-                            } catch (e) {
-                                console.log("Couldn't update Firestore, but image uploaded");
-                            }
-                        }
-                    );
-                } catch (error) {
-                    showStatus('Error: ' + error.message, 'error');
-                }
-            });
+  async function capturePhoto() {
+    try {
+      // Capture photo
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Show preview and change buttons
+      captureButton.textContent = '🔄 Retake';
+      captureButton.onclick = retakePhoto;
+      
+      // Add "Use This" button
+      if (!document.getElementById('use-button')) {
+        const useBtn = document.createElement('button');
+        useBtn.id = 'use-button';
+        useBtn.textContent = '✅ Use This';
+        useBtn.className = 'bg-green-500 text-white py-2 px-4 rounded-lg mx-2';
+        useBtn.onclick = uploadAndFinish;
+        captureButton.after(useBtn);
+      }
+      
+    } catch (err) {
+      showStatus('Capture failed: ' + err.message, 'error');
+    }
+  }
+
+  function retakePhoto() {
+    // Clear canvas
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Reset buttons
+    captureButton.textContent = '📸 Capture';
+    captureButton.onclick = capturePhoto;
+    document.getElementById('use-button')?.remove();
+  }
+
+  async function uploadAndFinish() {
+    try {
+      showStatus('Saving photo...', '');
+      
+      // Delete previous photo if exists
+      if (currentPhotoRef) {
+        try {
+          await currentPhotoRef.delete();
+          await db.collection('userPhotos').doc(currentPhotoRef.name).delete();
+        } catch (e) { console.log("No previous photo to delete") }
+      }
+      
+      // Upload new photo
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+      const photoName = `${pairedUserId}/${Date.now()}.jpg`;
+      currentPhotoRef = storage.ref().child(photoName);
+      
+      const uploadTask = currentPhotoRef.put(blob);
+      
+      uploadTask.on('state_changed',
+        null,
+        error => showStatus('Upload failed: ' + error.message, 'error'),
+        async () => {
+          const url = await uploadTask.snapshot.ref.getDownloadURL();
+          await db.collection('userPhotos').add({
+            userId: pairedUserId,
+            url: url,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          
+          // Stop camera and show success
+          stream.getTracks().forEach(track => track.stop());
+          showStatus('Photo saved! Check your dashboard.', 'success');
+          
+          // Remove buttons and show message
+          document.getElementById('use-button').remove();
+          captureButton.remove();
+          video.style.display = 'none';
+          canvas.style.display = 'none';
         }
+      );
+    } catch (err) {
+      showStatus('Error: ' + err.message, 'error');
+    }
+  }
 
-        function showStatus(message, type) {
-            statusDiv.textContent = message;
-            statusDiv.className = type ? type : '';
-        }
-    </script>
+  function showStatus(message, type) {
+    statusDiv.textContent = message;
+    statusDiv.className = type ? type : '';
+  }
+</script>
 </body>
 </html>

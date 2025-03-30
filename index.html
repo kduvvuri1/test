@@ -100,6 +100,23 @@
           overflow: hidden;
           background: black; /* Shows while camera loads */
         }
+
+        /* Add these new styles */
+        .final-message {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        #camera-section h2 {
+            margin-bottom: 1rem;
+        }
+        
+        #canvas {
+            display: none; /* Hide canvas by default */
+        }
     </style>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
@@ -300,51 +317,57 @@ function initializeCamera() {
     document.getElementById('use-button')?.remove();
   }
 
-  async function uploadAndFinish() {
+async function uploadAndFinish() {
     try {
-      showStatus('Saving photo...', '');
-      
-      // Delete previous photo if exists
-      if (currentPhotoRef) {
-        try {
-          await currentPhotoRef.delete();
-          await db.collection('userPhotos').doc(currentPhotoRef.name).delete();
-        } catch (e) { console.log("No previous photo to delete") }
-      }
-      
-      // Upload new photo
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
-      const photoName = `${pairedUserId}/${Date.now()}.jpg`;
-      currentPhotoRef = storage.ref().child(photoName);
-      
-      const uploadTask = currentPhotoRef.put(blob);
-      
-      uploadTask.on('state_changed',
-        null,
-        error => showStatus('Upload failed: ' + error.message, 'error'),
-        async () => {
-          const url = await uploadTask.snapshot.ref.getDownloadURL();
-          await db.collection('userPhotos').add({
-            userId: pairedUserId,
-            url: url,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          
-          // Stop camera and show success
-          stream.getTracks().forEach(track => track.stop());
-          showStatus('Photo saved! Check your dashboard.', 'success');
-          
-          // Remove buttons and show message
-          document.getElementById('use-button').remove();
-          captureButton.remove();
-          video.style.display = 'none';
-          canvas.style.display = 'none';
-        }
-      );
+        showStatus('Saving your photo...', '');
+        
+        // 1. Upload photo to Firebase Storage
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+        const photoName = `${pairedUserId}/${Date.now()}.jpg`;
+        const photoRef = storage.ref().child(photoName);
+        
+        const uploadTask = photoRef.put(blob);
+        
+        uploadTask.on('state_changed',
+            null,
+            error => {
+                console.error("Upload error:", error);
+                showStatus('Upload failed. Please try again.', 'error');
+            },
+            async () => {
+                // 2. Get download URL
+                const url = await uploadTask.snapshot.ref.getDownloadURL();
+                
+                // 3. Save to Firestore
+                await db.collection('userPhotos').add({
+                    userId: pairedUserId,
+                    url: url,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    status: 'completed'
+                });
+                
+                // 4. Clean up UI
+                stream.getTracks().forEach(track => track.stop());
+                video.style.display = 'none';
+                canvas.style.display = 'none';
+                document.getElementById('use-button')?.remove();
+                captureButton.remove();
+                
+                // 5. Show final message
+                cameraSection.innerHTML = `
+                    <div class="text-center py-8">
+                        <h2 class="text-2xl font-bold text-green-500 mb-4">✓ Photo Saved!</h2>
+                        <p class="text-lg">Your photo has been sent to the Dashboard</p>
+                        <p class="text-gray-500 mt-2">You can close this page now</p>
+                    </div>
+                `;
+            }
+        );
     } catch (err) {
-      showStatus('Error: ' + err.message, 'error');
+        console.error("Upload error:", err);
+        showStatus('Error saving photo. Please try again.', 'error');
     }
-  }
+}
 
   function showStatus(message, type) {
     statusDiv.textContent = message;

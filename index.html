@@ -2,29 +2,34 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CaughtMyEye - Mobile Capture</title>
     <!-- Tailwind via CDN for quick styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Custom styles to complement Tailwind */
+        /* Custom styles optimized for mobile */
         #video, #canvas {
             width: 100%;
-            max-width: 400px;
+            height: auto;
+            max-height: 60vh;
             border-radius: 0.5rem;
             border: 2px solid #3b82f6;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             background: #000;
+            transform: rotateY(180deg); /* Mirror the video for more natural feel */
         }
         
         #canvas {
             display: none;
             margin-top: 1rem;
+            transform: rotateY(180deg); /* Match video mirroring */
         }
         
         .section {
             display: none;
-            padding: 1.5rem;
+            padding: 1rem;
+            width: 100%;
+            box-sizing: border-box;
         }
         
         .section.active {
@@ -32,11 +37,15 @@
         }
         
         .btn {
-            padding: 0.75rem 1.5rem;
+            padding: 0.75rem 1.25rem;
             border-radius: 0.375rem;
             font-weight: 600;
             transition: all 0.2s;
-            margin: 0.5rem;
+            margin: 0.25rem;
+            font-size: 0.95rem;
+            flex-grow: 1;
+            max-width: 45%;
+            text-align: center;
         }
         
         .btn-primary {
@@ -44,7 +53,7 @@
             color: white;
         }
         
-        .btn-primary:hover {
+        .btn-primary:active {
             background-color: #2563eb;
         }
         
@@ -53,7 +62,7 @@
             color: #374151;
         }
         
-        .btn-secondary:hover {
+        .btn-secondary:active {
             background-color: #d1d5db;
         }
         
@@ -62,14 +71,15 @@
             color: white;
         }
         
-        .btn-success:hover {
+        .btn-success:active {
             background-color: #059669;
         }
         
         .status {
             padding: 0.75rem;
             border-radius: 0.375rem;
-            margin: 1rem 0;
+            margin: 0.75rem 0;
+            font-size: 0.9rem;
         }
         
         .status-success {
@@ -84,20 +94,30 @@
         
         .completion-message {
             text-align: center;
-            padding: 2rem;
+            padding: 1.5rem;
             color: #1f2937;
         }
         
         .code-input {
             width: 100%;
-            max-width: 300px;
             padding: 0.75rem;
             border: 2px solid #3b82f6;
             border-radius: 0.375rem;
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             text-align: center;
             margin: 1rem auto;
             display: block;
+            box-sizing: border-box;
+        }
+        
+        /* Prevent zooming on input focus */
+        input, select, textarea {
+            font-size: 16px !important;
+        }
+        
+        /* Better mobile tap targets */
+        button, input[type="submit"], input[type="button"] {
+            -webkit-tap-highlight-color: transparent;
         }
     </style>
     <!-- Firebase SDK -->
@@ -106,20 +126,20 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <div class="bg-blue-500 text-white p-4 text-center text-xl font-bold sticky top-0 z-50 shadow-md">
+    <div class="bg-blue-500 text-white p-3 text-center text-lg font-bold fixed top-0 left-0 right-0 z-50 shadow-md">
         CaughtMyEye
     </div>
 
-    <div class="container mx-auto p-4 pt-20">
+    <div class="container mx-auto px-3 pt-16 pb-4">
         <!-- Pairing Section -->
-        <div id="pairing-section" class="section active bg-white rounded-xl shadow-md p-6 max-w-md mx-auto">
-            <h2 class="text-xl font-semibold mb-4 text-center">🔗 Pair Device</h2>
-            <p class="text-gray-600 mb-4 text-center">Enter the 6-digit code from your dashboard</p>
+        <div id="pairing-section" class="section active bg-white rounded-xl shadow-md p-4 mx-auto">
+            <h2 class="text-lg font-semibold mb-3 text-center">🔗 Pair Device</h2>
+            <p class="text-gray-600 mb-3 text-center text-sm">Enter the 6-digit code from your dashboard</p>
             
             <input type="text" id="pairing-code" placeholder="Enter code" maxlength="6" 
-                   class="code-input uppercase font-mono tracking-widest">
+                   class="code-input uppercase font-mono tracking-widest" inputmode="numeric" pattern="[0-9A-Za-z]*">
             
-            <div class="flex justify-center">
+            <div class="flex justify-center mt-2">
                 <button id="pair-button" class="btn btn-primary">
                     Pair Device
                 </button>
@@ -129,15 +149,15 @@
         </div>
 
         <!-- Camera Section -->
-        <div id="camera-section" class="section bg-white rounded-xl shadow-md p-6 max-w-md mx-auto">
-            <h2 class="text-xl font-semibold mb-4 text-center">📷 Capture Landmark</h2>
+        <div id="camera-section" class="section bg-white rounded-xl shadow-md p-4 mx-auto">
+            <h2 class="text-lg font-semibold mb-3 text-center">📷 Capture Landmark</h2>
             
             <div class="relative">
                 <video id="video" autoplay playsinline></video>
                 <canvas id="canvas"></canvas>
             </div>
             
-            <div class="flex flex-wrap justify-center mt-4">
+            <div class="flex flex-wrap justify-center mt-3">
                 <button id="capture" class="btn btn-primary">
                     📸 Capture
                 </button>
@@ -145,7 +165,7 @@
                     🔄 Retake
                 </button>
                 <button id="use" class="btn btn-success hidden">
-                    ✅ Use This
+                    ✅ Use
                 </button>
             </div>
             
@@ -153,14 +173,14 @@
         </div>
         
         <!-- Completion Section -->
-        <div id="completion-section" class="section bg-white rounded-xl shadow-md p-6 max-w-md mx-auto">
+        <div id="completion-section" class="section bg-white rounded-xl shadow-md p-4 mx-auto">
             <div class="completion-message">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-green-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-14 w-14 text-green-500 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
-                <h2 class="text-2xl font-bold text-green-600 mb-2">Photo Uploaded!</h2>
-                <p class="text-gray-600 mb-4">Your image has been sent to the dashboard</p>
-                <p class="text-sm text-gray-500">You may now close this window</p>
+                <h2 class="text-xl font-bold text-green-600 mb-2">Photo Uploaded!</h2>
+                <p class="text-gray-600 mb-3 text-sm">Your image has been sent to the dashboard</p>
+                <p class="text-xs text-gray-500">You may now close this window</p>
             </div>
         </div>
     </div>
@@ -250,17 +270,28 @@
     }
     
     try {
+      // Mobile-friendly constraints
       const constraints = {
         video: {
           facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: Math.min(window.screen.width, 1280) },
+          height: { ideal: Math.min(window.screen.height, 720) },
+          frameRate: { ideal: 30 }
         },
         audio: false
       };
       
       stream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = stream;
+      
+      // Handle mobile orientation
+      const handleOrientationChange = () => {
+        const isPortrait = window.matchMedia("(orientation: portrait)").matches;
+        video.style.maxHeight = isPortrait ? '60vh' : '50vh';
+      };
+      
+      window.addEventListener('orientationchange', handleOrientationChange);
+      handleOrientationChange();
       
       // Set up button handlers
       captureBtn.addEventListener('click', capturePhoto);
@@ -269,7 +300,11 @@
       
     } catch (err) {
       console.error("Camera Error:", err);
-      showCameraStatus('Camera error: ' + err.message, 'error');
+      if (err.name === 'NotAllowedError') {
+        showCameraStatus('Camera access was denied. Please enable camera permissions in your browser settings.', 'error');
+      } else {
+        showCameraStatus('Camera error: ' + err.message, 'error');
+      }
     }
   }
 
@@ -279,7 +314,7 @@
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
-      // Draw image without mirroring
+      // Draw image (already mirrored via CSS)
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
@@ -318,15 +353,25 @@
       
       // Convert canvas to blob
       const blob = await new Promise(resolve => {
-        canvas.toBlob(resolve, 'image/jpeg', 0.9);
+        canvas.toBlob(resolve, 'image/jpeg', 0.85); // Slightly lower quality for faster upload
       });
+      
+      if (!blob) {
+        throw new Error('Failed to create image');
+      }
       
       // Create unique filename
       const photoName = `user_photos/${pairedUserId}/${Date.now()}.jpg`;
       const photoRef = storage.ref().child(photoName);
       
-      // Upload to Firebase Storage
-      const uploadTask = photoRef.put(blob);
+      // Upload to Firebase Storage with metadata
+      const uploadTask = photoRef.put(blob, {
+        customMetadata: {
+          orientation: window.screen.orientation.type,
+          deviceWidth: window.screen.width.toString(),
+          deviceHeight: window.screen.height.toString()
+        }
+      });
       
       uploadTask.on('state_changed',
         null,
@@ -343,12 +388,21 @@
             userId: pairedUserId,
             url: url,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            orientation: window.screen.orientation.type
+            orientation: window.screen.orientation.type,
+            deviceInfo: {
+              width: window.screen.width,
+              height: window.screen.height
+            }
           });
           
           // Show completion screen
           cameraSection.classList.remove('active');
           completionSection.classList.add('active');
+          
+          // Clean up
+          if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+          }
         }
       );
     } catch (err) {
@@ -361,15 +415,34 @@
   function showStatus(message, type) {
     statusDiv.textContent = message;
     statusDiv.className = `status ${type ? 'status-' + type : ''}`;
+    // Auto-scroll to show the message
+    statusDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   
   function showCameraStatus(message, type) {
     cameraStatusDiv.textContent = message;
     cameraStatusDiv.className = `status ${type ? 'status-' + type : ''}`;
+    cameraStatusDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   
-  // Auto-focus the input field
+  // Auto-focus the input field and prevent zoom
   pairingCodeInput.focus();
+  setTimeout(() => {
+    pairingCodeInput.focus();
+  }, 500);
+  
+  // Prevent form submission on Enter key
+  pairingCodeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      pairButton.click();
+    }
+  });
+  
+  // Better mobile keyboard handling
+  pairingCodeInput.addEventListener('input', (e) => {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  });
 </script>
 </body>
 </html>

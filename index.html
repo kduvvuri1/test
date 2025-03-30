@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CaughtMyEye - Mobile Capture</title>
-    <!-- Tailwind via CDN for quick styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Custom styles optimized for mobile */
         #video, #canvas {
             width: 100%;
             height: auto;
@@ -108,17 +106,14 @@
             box-sizing: border-box;
         }
         
-        /* Prevent zooming on input focus */
         input, select, textarea {
             font-size: 16px !important;
         }
         
-        /* Better mobile tap targets */
         button, input[type="submit"], input[type="button"] {
             -webkit-tap-highlight-color: transparent;
         }
     </style>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js"></script>
@@ -129,7 +124,6 @@
     </div>
 
     <div class="container mx-auto px-3 pt-16 pb-4">
-        <!-- Pairing Section -->
         <div id="pairing-section" class="section active bg-white rounded-xl shadow-md p-4 mx-auto">
             <h2 class="text-lg font-semibold mb-3 text-center">🔗 Pair Device</h2>
             <p class="text-gray-600 mb-3 text-center text-sm">Enter the pairing code from your dashboard</p>
@@ -146,7 +140,6 @@
             <div id="status" class="status"></div>
         </div>
 
-        <!-- Camera Section -->
         <div id="camera-section" class="section bg-white rounded-xl shadow-md p-4 mx-auto">
             <h2 class="text-lg font-semibold mb-3 text-center">📷 Capture Landmark</h2>
             
@@ -170,7 +163,6 @@
             <div id="camera-status" class="status"></div>
         </div>
         
-        <!-- Completion Section -->
         <div id="completion-section" class="section bg-white rounded-xl shadow-md p-4 mx-auto">
             <div class="completion-message">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-14 w-14 text-green-500 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -184,7 +176,6 @@
     </div>
 
 <script>
-  // Firebase initialization
   const firebaseConfig = {
     apiKey: "AIzaSyD6QROJZ1Y3ZfiugqBxpPeeuQ7J3K22CbQ",
     authDomain: "first-project-418816.firebaseapp.com",
@@ -197,7 +188,6 @@
   const db = firebase.firestore();
   const storage = firebase.storage();
 
-  // DOM elements
   const pairingSection = document.getElementById('pairing-section');
   const cameraSection = document.getElementById('camera-section');
   const completionSection = document.getElementById('completion-section');
@@ -214,7 +204,6 @@
   let pairedUserId = null;
   let stream = null;
 
-  // Pairing logic
   pairButton.addEventListener('click', async () => {
     const code = pairingCodeInput.value.trim();
     
@@ -248,7 +237,6 @@
         pairedUserId = data.userId;
         showStatus('Paired successfully! Loading camera...', 'success');
         
-        // Transition to camera view
         setTimeout(() => {
             pairingSection.classList.remove('active');
             cameraSection.classList.add('active');
@@ -261,14 +249,12 @@
     }
   });
 
-  // Camera logic
   async function initializeCamera() {
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
     }
     
     try {
-      // Mobile-friendly constraints
       const constraints = {
         video: {
           facingMode: "environment",
@@ -281,8 +267,8 @@
       
       stream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = stream;
+      video.style.transform = 'scaleX(-1)';
       
-      // Handle mobile orientation
       const handleOrientationChange = () => {
         const isPortrait = window.matchMedia("(orientation: portrait)").matches;
         video.style.maxHeight = isPortrait ? '60vh' : '50vh';
@@ -291,7 +277,6 @@
       window.addEventListener('orientationchange', handleOrientationChange);
       handleOrientationChange();
       
-      // Set up button handlers
       captureBtn.addEventListener('click', capturePhoto);
       retakeBtn.addEventListener('click', retakePhoto);
       useBtn.addEventListener('click', uploadAndFinish);
@@ -308,21 +293,20 @@
 
   function capturePhoto() {
     try {
-      // Set canvas dimensions to match video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
-      // Draw image (already mirrored via CSS)
       const ctx = canvas.getContext('2d');
+      ctx.scale(-1, 1);
+      ctx.translate(-canvas.width, 0);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Show canvas and buttons
       canvas.style.display = 'block';
+      canvas.style.transform = 'scaleX(-1)';
       captureBtn.classList.add('hidden');
       retakeBtn.classList.remove('hidden');
       useBtn.classList.remove('hidden');
       
-      // Pause the video stream
       stream.getTracks().forEach(track => track.stop());
       
     } catch (err) {
@@ -331,17 +315,14 @@
   }
 
   function retakePhoto() {
-    // Clear canvas
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     canvas.style.display = 'none';
     
-    // Reset buttons
     captureBtn.classList.remove('hidden');
     retakeBtn.classList.add('hidden');
     useBtn.classList.add('hidden');
     
-    // Restart camera
     initializeCamera();
   }
 
@@ -349,12 +330,10 @@
     try {
       showCameraStatus('Saving your photo...', '');
       
-      // 1. Verify we have a paired user ID
       if (!pairedUserId) {
         throw new Error('No paired user found');
       }
 
-      // 2. Convert canvas to blob with error handling
       const blob = await new Promise((resolve, reject) => {
         canvas.toBlob(blob => {
           if (!blob) {
@@ -365,13 +344,11 @@
         }, 'image/jpeg', 0.85);
       });
 
-      // 3. Create storage reference
       const storageRef = storage.ref();
       const timestamp = Date.now();
       const photoName = `user_photos/${pairedUserId}/${timestamp}.jpg`;
       const photoRef = storageRef.child(photoName);
 
-      // 4. Upload with metadata
       const uploadTask = photoRef.put(blob, {
         contentType: 'image/jpeg',
         customMetadata: {
@@ -380,27 +357,22 @@
         }
       });
 
-      // 5. Set up upload state listeners
       uploadTask.on('state_changed',
         (snapshot) => {
-          // Progress tracking (optional)
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           console.log(`Upload progress: ${progress}%`);
         },
         (error) => {
           console.error('Upload error:', error);
           showCameraStatus('Upload failed. Please try again.', 'error');
-          // Reset buttons for retry
           retakeBtn.classList.remove('hidden');
           useBtn.classList.remove('hidden');
         },
         async () => {
           try {
-            // 6. Get download URL after successful upload
             const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
             console.log('File available at', downloadURL);
 
-            // 7. Save to Firestore
             await db.collection('userPhotos').add({
               userId: pairedUserId,
               url: downloadURL,
@@ -409,7 +381,6 @@
               status: 'uploaded'
             });
 
-            // 8. Show success
             cameraSection.classList.remove('active');
             completionSection.classList.add('active');
           } catch (dbError) {
@@ -422,17 +393,14 @@
     } catch (error) {
       console.error('Upload process error:', error);
       showCameraStatus('Error: ' + error.message, 'error');
-      // Keep buttons visible for retry
       retakeBtn.classList.remove('hidden');
       useBtn.classList.remove('hidden');
     }
   }
 
-  // Helper functions
   function showStatus(message, type) {
     statusDiv.textContent = message;
     statusDiv.className = `status ${type ? 'status-' + type : ''}`;
-    // Auto-scroll to show the message
     statusDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   
@@ -442,13 +410,11 @@
     cameraStatusDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   
-  // Auto-focus the input field and prevent zoom
   pairingCodeInput.focus();
   setTimeout(() => {
     pairingCodeInput.focus();
   }, 500);
   
-  // Prevent form submission on Enter key
   pairingCodeInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();

@@ -139,78 +139,51 @@
          const canvas = document.getElementById('canvas');
          const captureButton = document.getElementById('capture');
          let pairedUserId = null;
- 
-         // Pairing logic
-         pairButton.addEventListener('click', async () => {
-             const code = pairingCodeInput.value.trim().toUpperCase();
-             if (!code || code.length !== 6) {
-                 showStatus('Please enter a valid 6-digit code', 'error');
-                 return;
-             }
- 
-         
-             try {
-                 showStatus('Pairing...', '');
-                 showStatus('Verifying code...', '');
- 
-                 // Use Firebase's REST API to bypass security rules for pairing
-                 const pairingEndpoint = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/pairingCodes/${code}`;
-                 // Use the Firebase SDK instead of REST API for simplicity
-                 const docRef = db.collection('pairingCodes').doc(code);
-                 const docSnap = await docRef.get();
- 
-                 // First get the code to verify it exists
-                 const getResponse = await fetch(pairingEndpoint);
-                 if (!getResponse.ok) {
-                 console.log("Code check result:", docSnap.exists()); // Debug log
-                 
-                 if (!docSnap.exists) {
-                     throw new Error('Invalid pairing code');
-                 }
- 
-                 const data = await getResponse.json();
-                 const codeData = data.fields;
-                 const data = docSnap.data();
-                 console.log("Retrieved code data:", data); // Debug log
- 
-                 if (codeData.status.stringValue === 'completed') {
-                 if (data.status === 'completed') {
-                     throw new Error('This code has already been used');
-                 }
-                 
-                 // Complete the pairing using PATCH
-                 const patchResponse = await fetch(pairingEndpoint, {
-                     method: 'PATCH',
-                     body: JSON.stringify({
-                         fields: {
-                             status: { stringValue: 'completed' },
-                             pairedAt: { timestampValue: new Date().toISOString() }
-                         }
-                     }),
-                     headers: { 'Content-Type': 'application/json' }
-         
-                 // Update using the Firebase SDK
-                 await docRef.update({
-                     status: 'completed',
-                     pairedAt: firebase.firestore.FieldValue.serverTimestamp()
-                 });
- 
-                 if (!patchResponse.ok) {
-                     throw new Error('Pairing failed');
-                 }
-                 
-                 pairedUserId = codeData.userId.stringValue;
-                 pairedUserId = data.userId;
-                 showStatus('Device paired successfully!', 'success');
- 
-                 // Switch to camera view
-                 pairingSection.classList.remove('active');
-                 cameraSection.classList.add('active');
-                 initializeCamera();
-             } catch (error) {
-                 console.error('Pairing error details:', error); // Detailed error log
-                 showStatus('Pairing failed: ' + error.message, 'error');
-                 console.error('Pairing error:', error);
+      
+        // Pairing logic
+        pairButton.addEventListener('click', async () => {
+            const code = pairingCodeInput.value.trim().toUpperCase();
+            if (!code || code.length !== 6) {
+                showStatus('Please enter a valid 6-digit code', 'error');
+                return;
+            }
+        
+            try {
+                showStatus('Pairing...', '');
+                
+                // Use Firebase SDK for pairing
+                const docRef = db.collection('pairingCodes').doc(code);
+                const docSnap = await docRef.get();
+        
+                console.log("Code check result:", docSnap.exists()); // Debug log
+                
+                if (!docSnap.exists) {
+                    throw new Error('Invalid pairing code');
+                }
+        
+                const data = docSnap.data();
+                console.log("Retrieved code data:", data); // Debug log
+        
+                if (data.status === 'completed') {
+                    throw new Error('This code has already been used');
+                }
+                
+                // Update using the Firebase SDK
+                await docRef.update({
+                    status: 'completed',
+                    pairedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+        
+                pairedUserId = data.userId;
+                showStatus('Device paired successfully!', 'success');
+        
+                // Switch to camera view
+                pairingSection.classList.remove('active');
+                cameraSection.classList.add('active');
+                initializeCamera();
+            } catch (error) {
+                console.error('Pairing error:', error);
+                showStatus('Pairing failed: ' + error.message, 'erro
              }
          });
  

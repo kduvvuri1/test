@@ -88,12 +88,6 @@
             background-color: #f8d7da;
             color: #721c24;
         }
-
-        #video {
-          -webkit-transform: scaleX(-1); /* Mirror for front camera */
-          transform: scaleX(-1);
-          object-fit: cover;
-        }
         
         #camera-section {
           position: relative;
@@ -220,74 +214,61 @@ async function checkPermissions() {
 }
 
   // Camera logic
-function initializeCamera() {
-  // Stop any existing stream
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop());
-  }
-
-  // Mobile-friendly constraints
-  const constraints = {
-    video: {
-      facingMode: "environment",
-      width: { ideal: 1280 },
-      height: { ideal: 720 }
-    },
-    audio: false
-  };
-
-  navigator.mediaDevices.getUserMedia(constraints)
-    .then(s => {
-      stream = s;
-      video.srcObject = stream;
-      video.play(); // Important for mobile
-      
-      // Mobile-specific fixes
-      video.setAttribute('playsinline', '');
-      video.setAttribute('webkit-playsinline', '');
-    })
-    .catch(err => {
-      console.error("Camera Error:", err);
-      showStatus('Camera error: ' + err.message, 'error');
-      
-      // Fallback to less strict constraints
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(fallbackStream => {
-          stream = fallbackStream;
-          video.srcObject = stream;
-        })
-        .catch(fallbackErr => {
-          showStatus('Cannot access camera', 'error');
-        });
-    });
-}
-
-  async function capturePhoto() {
-    try {
-      // Capture photo
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Show preview and change buttons
-      captureButton.textContent = '🔄 Retake';
-      captureButton.onclick = retakePhoto;
-      
-      // Add "Use This" button
-      if (!document.getElementById('use-button')) {
-        const useBtn = document.createElement('button');
-        useBtn.id = 'use-button';
-        useBtn.textContent = '✅ Use This';
-        useBtn.className = 'bg-green-500 text-white py-2 px-4 rounded-lg mx-2';
-        useBtn.onclick = uploadAndFinish;
-        captureButton.after(useBtn);
+    function initializeCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
       }
-      
-    } catch (err) {
-      showStatus('Capture failed: ' + err.message, 'error');
+    
+      const constraints = {
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      };
+    
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then(s => {
+          stream = s;
+          video.srcObject = stream;
+          video.setAttribute('playsinline', '');
+          video.setAttribute('webkit-playsinline', '');
+          return video.play();
+        })
+        .catch(err => {
+          console.error("Camera Error:", err);
+          showStatus('Camera error: ' + err.message, 'error');
+        });
     }
-  }
+
+    async function capturePhoto() {
+      try {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        
+        // Draw image without mirroring
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Show canvas preview
+        canvas.style.display = 'block';
+        
+        captureButton.textContent = '🔄 Retake';
+        captureButton.onclick = retakePhoto;
+        
+        if (!document.getElementById('use-button')) {
+          const useBtn = document.createElement('button');
+          useBtn.id = 'use-button';
+          useBtn.textContent = '✅ Use This';
+          useBtn.className = 'bg-green-500 text-white py-2 px-4 rounded-lg mx-2';
+          useBtn.onclick = uploadAndFinish;
+          captureButton.after(useBtn);
+        }
+      } catch (err) {
+        showStatus('Capture failed: ' + err.message, 'error');
+      }
+    }
 
   function retakePhoto() {
     // Clear canvas
@@ -301,55 +282,44 @@ function initializeCamera() {
   }
 
 async function uploadAndFinish() {
-    try {
-        showStatus('Saving your photo...', '');
+  try {
+    showStatus('Saving your photo...', '');
+    
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+    const photoName = `${pairedUserId}/${Date.now()}.jpg`;
+    const photoRef = storage.ref().child(photoName);
+    
+    const uploadTask = photoRef.put(blob);
+    
+    uploadTask.on('state_changed',
+      null,
+      error => showStatus('Upload failed: ' + error.message, 'error'),
+      async () => {
+        const url = await uploadTask.snapshot.ref.getDownloadURL();
+        await db.collection('userPhotos').add({
+          userId: pairedUserId,
+          url: url,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
         
-        // 1. Upload photo to Firebase Storage
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
-        const photoName = `${pairedUserId}/${Date.now()}.jpg`;
-        const photoRef = storage.ref().child(photoName);
+        // Clean up
+        stream.getTracks().forEach(track => track.stop());
         
-        const uploadTask = photoRef.put(blob);
-        
-        uploadTask.on('state_changed',
-            null,
-            error => {
-                console.error("Upload error:", error);
-                showStatus('Upload failed. Please try again.', 'error');
-            },
-            async () => {
-                // 2. Get download URL
-                const url = await uploadTask.snapshot.ref.getDownloadURL();
-                
-                // 3. Save to Firestore
-                await db.collection('userPhotos').add({
-                    userId: pairedUserId,
-                    url: url,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    status: 'completed'
-                });
-                
-                // 4. Clean up UI
-                stream.getTracks().forEach(track => track.stop());
-                video.style.display = 'none';
-                canvas.style.display = 'none';
-                document.getElementById('use-button')?.remove();
-                captureButton.remove();
-                
-                // 5. Show final message
-                cameraSection.innerHTML = `
-                    <div class="text-center py-8">
-                        <h2 class="text-2xl font-bold text-green-500 mb-4">✓ Photo Saved!</h2>
-                        <p class="text-lg">Your photo has been sent to the Dashboard</p>
-                        <p class="text-gray-500 mt-2">You can close this page now</p>
-                    </div>
-                `;
-            }
-        );
-    } catch (err) {
-        console.error("Upload error:", err);
-        showStatus('Error saving photo. Please try again.', 'error');
-    }
+        // Show completion message
+        cameraSection.innerHTML = `
+          <div class="completion-message">
+            <h2 style="color: #155724; font-size: 1.5rem; margin-bottom: 1rem;">
+              ✓ Photo Successfully Uploaded!
+            </h2>
+            <p>Your image has been sent to the Dashboard</p>
+            <p style="color: #666; margin-top: 1rem;">You may now close this window</p>
+          </div>
+        `;
+      }
+    );
+  } catch (err) {
+    showStatus('Error: ' + err.message, 'error');
+  }
 }
 
   function showStatus(message, type) {

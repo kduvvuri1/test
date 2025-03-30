@@ -347,67 +347,82 @@
     initializeCamera();
   }
 
-  async function uploadAndFinish() {
+ async function uploadAndFinish() {
     try {
       showCameraStatus('Saving your photo...', '');
       
-      // Convert canvas to blob
-      const blob = await new Promise(resolve => {
-        canvas.toBlob(resolve, 'image/jpeg', 0.85); // Slightly lower quality for faster upload
-      });
-      
-      if (!blob) {
-        throw new Error('Failed to create image');
+      // First ensure we have a valid user ID
+      if (!pairedUserId) {
+        throw new Error('Not paired with any user');
       }
-      
-      // Create unique filename
+
+      // Convert canvas to blob with error handling
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(blob => {
+          if (!blob) {
+            reject(new Error('Failed to create image blob'));
+          } else {
+            resolve(blob);
+          }
+        }, 'image/jpeg', 0.85);
+      });
+
+      // Create storage reference with proper path
+      const storageRef = storage.ref();
       const photoName = `user_photos/${pairedUserId}/${Date.now()}.jpg`;
-      const photoRef = storage.ref().child(photoName);
-      
-      // Upload to Firebase Storage with metadata
+      const photoRef = storageRef.child(photoName);
+
+      // Create upload task with metadata
       const uploadTask = photoRef.put(blob, {
+        contentType: 'image/jpeg',
         customMetadata: {
-          orientation: window.screen.orientation.type,
-          deviceWidth: window.screen.width.toString(),
-          deviceHeight: window.screen.height.toString()
+          uploadedAt: new Date().toISOString(),
+          orientation: window.screen.orientation.type
         }
       });
       
-      uploadTask.on('state_changed',
-        null,
-        error => {
-          showCameraStatus('Upload failed: ' + error.message, 'error');
-          retakePhoto(); // Allow user to try again
-        },
-        async () => {
-          // Get download URL
-          const url = await uploadTask.snapshot.ref.getDownloadURL();
-          
-          // Save to Firestore
-          await db.collection('userPhotos').add({
-            userId: pairedUserId,
-            url: url,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            orientation: window.screen.orientation.type,
-            deviceInfo: {
-              width: window.screen.width,
-              height: window.screen.height
+return new Promise((resolve, reject) => {
+        uploadTask.on('state_changed',
+          null, // No progress handler needed
+          (error) => {
+            console.error('Upload error:', error);
+            showCameraStatus('Upload failed. Please try again.', 'error');
+            reject(error);
+          },
+          async () => {
+            try {
+              // Get download URL
+              const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+              
+              // Save to Firestore
+              await db.collection('userPhotos').add({
+                userId: pairedUserId,
+                url: downloadURL,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                orientation: window.screen.orientation.type,
+                status: 'uploaded'
+              });
+
+              // Show completion
+              showCameraStatus('Photo saved successfully!', 'success');
+              cameraSection.classList.remove('active');
+              completionSection.classList.add('active');
+              resolve();
+            } catch (error) {
+              console.error('Firestore save error:', error);
+              showCameraStatus('Failed to save photo details.', 'error');
+              reject(error);
             }
-          });
-          
-          // Show completion screen
-          cameraSection.classList.remove('active');
-          completionSection.classList.add('active');
-          
-          // Clean up
-          if (stream) {
-            stream.getTracks().forEach(track => track.stop());
           }
-        }
-      );
-    } catch (err) {
-      showCameraStatus('Error: ' + err.message, 'error');
-      console.error('Upload error:', err);
+        );
+      });
+    } catch (error) {
+      console.error('Upload process error:', error);
+      showCameraStatus('Error: ' + error.message, 'error');
+      
+      // Allow retry by showing buttons again
+      retakeBtn.classList.remove('hidden');
+      useBtn.classList.remove('hidden');
     }
   }
 

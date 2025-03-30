@@ -88,6 +88,18 @@
             background-color: #f8d7da;
             color: #721c24;
         }
+
+        #video {
+          -webkit-transform: scaleX(-1); /* Mirror for front camera */
+          transform: scaleX(-1);
+          object-fit: cover;
+        }
+        
+        #camera-section {
+          position: relative;
+          overflow: hidden;
+          background: black; /* Shows while camera loads */
+        }
     </style>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
@@ -107,7 +119,7 @@
 
         <div id="camera-section">
             <h2>Take a Picture</h2>
-            <video id="video" autoplay playsinline></video>
+            <video id="video" autoplay playsinline webkit-playsinline></video>
             <button id="capture">📸 Capture</button>
             <canvas id="canvas"></canvas>
             <div id="status"></div>
@@ -193,20 +205,62 @@
     }
 });
 
-  // Camera logic
-  function initializeCamera() {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then(s => {
-        stream = s;
-        video.srcObject = stream;
-      })
-      .catch(err => {
-        showStatus('Camera error: ' + err.message, 'error');
-      });
-
-    captureButton.textContent = '📸 Capture';
-    captureButton.onclick = capturePhoto;
+// Add this check before camera init
+async function checkPermissions() {
+  try {
+    const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+    if (permissionStatus.state === 'denied') {
+      showStatus('Please enable camera permissions in browser settings', 'error');
+      return false;
+    }
+    return true;
+  } catch (e) {
+    return true; // Proceed if Permission API not available
   }
+}
+
+  // Camera logic
+function initializeCamera() {
+  // Stop any existing stream
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+  }
+
+  // Mobile-friendly constraints
+  const constraints = {
+    video: {
+      facingMode: "environment",
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    },
+    audio: false
+  };
+
+  navigator.mediaDevices.getUserMedia(constraints)
+    .then(s => {
+      stream = s;
+      video.srcObject = stream;
+      video.play(); // Important for mobile
+      
+      // Mobile-specific fixes
+      video.setAttribute('playsinline', '');
+      video.setAttribute('webkit-playsinline', '');
+    })
+    .catch(err => {
+      console.error("Camera Error:", err);
+      showStatus('Camera error: ' + err.message, 'error');
+      
+      // Fallback to less strict constraints
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(fallbackStream => {
+          stream = fallbackStream;
+          video.srcObject = stream;
+        })
+        .catch(fallbackErr => {
+          showStatus('Cannot access camera', 'error');
+        });
+    });
+}
 
   async function capturePhoto() {
     try {

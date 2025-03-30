@@ -115,7 +115,7 @@
     </div>
 
 <script>
-  // Firebase initialization (keep your existing config)
+  // Firebase initialization
   const firebaseConfig = {
     apiKey: "AIzaSyD6QROJZ1Y3ZfiugqBxpPeeuQ7J3K22CbQ",
     authDomain: "first-project-418816.firebaseapp.com",
@@ -141,9 +141,49 @@
   let currentPhotoRef = null;
   let stream = null;
 
-  // Pairing logic (keep your existing pairing code)
+  // Pairing logic
+  pairButton.addEventListener('click', async () => {
+    const code = pairingCodeInput.value.trim().toUpperCase();
+    if (!code || code.length !== 6) {
+      showStatus('Please enter a valid 6-digit code', 'error');
+      return;
+    }
 
-  // New camera logic
+    try {
+      showStatus('Verifying code...', '');
+      
+      const docRef = db.collection('pairingCodes').doc(code);
+      const docSnap = await docRef.get();
+      
+      if (!docSnap.exists) {
+        throw new Error('Invalid pairing code');
+      }
+      
+      const data = docSnap.data();
+      
+      if (data.status !== 'pending') {
+        throw new Error('This code has already been used');
+      }
+
+      await docRef.update({
+        status: 'completed',
+        pairedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      
+      pairedUserId = data.userId;
+      showStatus('Device paired successfully!', 'success');
+      
+      // Switch to camera view
+      pairingSection.classList.remove('active');
+      cameraSection.classList.add('active');
+      initializeCamera();
+    } catch (error) {
+      console.error('Pairing error:', error);
+      showStatus('Pairing failed: ' + error.message, 'error');
+    }
+  });
+
+  // Camera logic
   function initializeCamera() {
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(s => {

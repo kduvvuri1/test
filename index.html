@@ -144,44 +144,54 @@
   // Pairing logic
   pairButton.addEventListener('click', async () => {
     const code = pairingCodeInput.value.trim().toUpperCase();
+    console.log("Attempting to pair with code:", code); // Debug
+    
     if (!code || code.length !== 6) {
-      showStatus('Please enter a valid 6-digit code', 'error');
-      return;
+        showStatus('Please enter a valid 6-digit code', 'error');
+        return;
     }
 
     try {
-      showStatus('Verifying code...', '');
-      
-      const docRef = db.collection('pairingCodes').doc(code);
-      const docSnap = await docRef.get();
-      
-      if (!docSnap.exists) {
-        throw new Error('Invalid pairing code');
-      }
-      
-      const data = docSnap.data();
-      
-      if (data.status !== 'pending') {
-        throw new Error('This code has already been used');
-      }
+        showStatus('Verifying code...', '');
+        
+        const docRef = db.collection('pairingCodes').doc(code);
+        const docSnap = await docRef.get();
+        console.log("Firestore response:", docSnap.exists, docSnap.data()); // Debug
+        
+        if (!docSnap.exists) {
+            throw new Error('Invalid pairing code - please generate a new one');
+        }
+        
+        const data = docSnap.data();
+        console.log("Retrieved code data:", data); // Debug
+        
+        if (data.status !== 'pending') {
+            throw new Error('This code was already used or expired');
+        }
 
-      await docRef.update({
-        status: 'completed',
-        pairedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      
-      pairedUserId = data.userId;
-      showStatus('Device paired successfully!', 'success');
-      
-      // Switch to camera view
-      pairingSection.classList.remove('active');
-      cameraSection.classList.add('active');
-      initializeCamera();
+        console.log("Attempting to update document..."); // Debug
+        await docRef.update({
+            status: 'completed',
+            pairedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            pairedUserId: data.userId
+        });
+        
+        pairedUserId = data.userId;
+        console.log("Pairing successful, user ID:", pairedUserId); // Debug
+        showStatus('Paired successfully! Loading camera...', 'success');
+        
+        // Add 1-second delay for UI feedback
+        setTimeout(() => {
+            pairingSection.classList.remove('active');
+            cameraSection.classList.add('active');
+            initializeCamera();
+        }, 1000);
+        
     } catch (error) {
-      console.error('Pairing error:', error);
-      showStatus('Pairing failed: ' + error.message, 'error');
+        console.error('Full pairing error:', error); // Detailed error
+        showStatus('Pairing failed: ' + error.message, 'error');
     }
-  });
+});
 
   // Camera logic
   function initializeCamera() {

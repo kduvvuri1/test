@@ -267,7 +267,6 @@
       
       stream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = stream;
-      video.style.transform = 'scaleX(-1)';
       
       const handleOrientationChange = () => {
         const isPortrait = window.matchMedia("(orientation: portrait)").matches;
@@ -297,12 +296,9 @@
       canvas.height = video.videoHeight;
       
       const ctx = canvas.getContext('2d');
-      ctx.scale(-1, 1);
-      ctx.translate(-canvas.width, 0);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
       canvas.style.display = 'block';
-      canvas.style.transform = 'scaleX(-1)';
       captureBtn.classList.add('hidden');
       retakeBtn.classList.remove('hidden');
       useBtn.classList.remove('hidden');
